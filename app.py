@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Cargar el dataset NBA (ajustar la ruta si es necesario)
-nba_data = pd.read_csv("datasets/nba_dataset.csv")
+nba_data = pd.read_csv("datasets/nba_all_elodataset.csv")
 
 # Barra lateral para seleccionar el año
 year_list = sorted(nba_data['year_id'].unique())
