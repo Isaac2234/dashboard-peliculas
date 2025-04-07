@@ -2,60 +2,57 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-movies_data = pd.read_csv("datasets/movies.csv")
+# Cargar el dataset NBA (ajustar la ruta si es necesario)
+nba_data = pd.read_csv("datasets/nba_dataset.csv")
 
-# valores unicos para cada componente en la barra lateral
-score_rating = movies_data['score'].unique().tolist()
-genre_list = movies_data['genre'].unique().tolist()
-year_list = movies_data['year'].unique().tolist()
+# Barra lateral para seleccionar el año
+year_list = sorted(nba_data['year_id'].unique())
+year_selected = st.sidebar.selectbox("Seleccionar Año", year_list)
 
-with st.sidebar:
-    st.write("Seleccionar un valor para el score de la pelicula \
-            dentro del rango del slider")
-    
-    # slider para score de usuario
-    new_score_rating = st.slider(
-            label = "Seleccionar valor:",
-            min_value = 1.0,
-            max_value = 10.0,
-            value = (3.0,4.0))
-    
-    # widget de multiseleccion para el genero
-    new_genre_list = st.multiselect(
-            'Seleccionar genero:',
-            genre_list, default = ['Animation', 'Horror',  'Fantasy', 'Romance'])
+# Barra lateral para seleccionar equipo
+team_list = sorted(nba_data['team_id'].unique())
+team_selected = st.sidebar.selectbox("Seleccionar Equipo", team_list)
 
-    # caja de seleccion para el año
-    year = st.selectbox('Seleccionar año', year_list, 0)
+# Barra lateral para seleccionar el tipo de juegos
+game_type = st.sidebar.radio("Seleccionar tipo de juegos", ['Temporada Regular', 'Playoffs', 'Todos'])
 
-# filtro para los scores del slider
-score_info = (movies_data['score'].between(*new_score_rating))
+# Filtrar los datos según el año, el equipo y el tipo de juego
+filtered_data = nba_data[(nba_data['year_id'] == year_selected) & (nba_data['team_id'] == team_selected)]
 
-# filtro para el genero y año
-new_genre_year = (movies_data['genre'].isin(new_genre_list)) & (movies_data['year'] == year)
+# Filtrar según tipo de juego (si es "Playoffs", "Temporada Regular" o "Todos")
+if game_type == 'Temporada Regular':
+    filtered_data = filtered_data[filtered_data['is_playoffs'] == 0]
+elif game_type == 'Playoffs':
+    filtered_data = filtered_data[filtered_data['is_playoffs'] == 1]
 
-# gráficas
-col1, col2 = st.columns([2,3])
-with col1:
-    st.write("""#### Peliculas filtradas por año y genero """)
+# Gráfica acumulada de juegos ganados y perdidos por temporada
+filtered_data['win'] = filtered_data['game_result'] == 'W'
+filtered_data['loss'] = filtered_data['game_result'] == 'L'
 
-    dataframe_genre_year = movies_data[new_genre_year].groupby(['name',  'genre'])['year'].sum()
-    dataframe_genre_year = dataframe_genre_year.reset_index()
-    
-    st.dataframe(dataframe_genre_year, width = 400)
+games_won = filtered_data.groupby('year_id')['win'].cumsum()
+games_lost = filtered_data.groupby('year_id')['loss'].cumsum()
 
-with col2:
-    st.write("""#### Year vs. Budget """)
-    
-    df = movies_data[score_info]
+# Crear la gráfica de líneas
+fig, ax = plt.subplots(figsize=(10, 6))
 
-    df_score = df.groupby("year")["budget"].mean()
-    df_score = df_score.reset_index().fillna(0)
-    
-    fig = plt.figure(figsize = (12, 10))
-    
-    plt.plot(df_score["year"], df_score["budget"], 'r-')
-    plt.xlabel('year')
-    plt.ylabel('budget')
-    
-    st.pyplot(fig)
+ax.plot(filtered_data['gameorder'], games_won, label="Juegos Ganados", color='g')
+ax.plot(filtered_data['gameorder'], games_lost, label="Juegos Perdidos", color='r')
+
+ax.set_xlabel('Número de Juego')
+ax.set_ylabel('Acumulado de Juegos')
+ax.set_title(f'Acumulado de Juegos Ganados y Perdidos en {year_selected} para el Equipo {team_selected}')
+ax.legend()
+
+st.pyplot(fig)
+
+# Gráfica de pastel de porcentaje de juegos ganados y perdidos
+total_games = len(filtered_data)
+won_games = filtered_data['win'].sum()
+lost_games = filtered_data['loss'].sum()
+
+# Crear la gráfica de pastel
+fig_pie, ax_pie = plt.subplots(figsize=(6, 6))
+ax_pie.pie([won_games, lost_games], labels=['Juegos Ganados', 'Juegos Perdidos'], autopct='%1.1f%%', colors=['g', 'r'])
+ax_pie.set_title(f'Porcentaje de Juegos Ganados y Perdidos en {year_selected} para el Equipo {team_selected}')
+
+st.pyplot(fig_pie)
