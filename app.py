@@ -2,30 +2,30 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Cargar el dataset
+
 df = pd.read_csv("datasets/nba_all_elo.csv")
 
 # Asegurarse de que las fechas estén en formato datetime
 df["date_game"] = pd.to_datetime(df["date_game"])
 
-# Título
+
 st.title("Dashboard de Juegos NBA")
 
-# --- Filtros en la barra lateral ---
+
 with st.sidebar:
     st.header("Filtros")
 
-    # Año
+    
     year = st.selectbox("Selecciona el año", sorted(df["year_id"].unique(), reverse=True))
 
-    # Equipos disponibles para ese año
+    
     equipos_disponibles = df[df["year_id"] == year]["team_id"].unique()
     equipo = st.selectbox("Selecciona el equipo", sorted(equipos_disponibles))
 
-    # Pills (radio horizontal) para tipo de juego
+    
     tipo_juego = st.pills("Tipo de juego", ["Temporada Regular", "Playoffs", "Ambos"])
 
-# Filtrar base según selección
+
 if tipo_juego == "Temporada Regular":
     df_filtrado = df[(df["year_id"] == year) & (df["team_id"] == equipo) & (df["is_playoffs"] == 0)]
 elif tipo_juego == "Playoffs":
@@ -33,10 +33,10 @@ elif tipo_juego == "Playoffs":
 else:
     df_filtrado = df[(df["year_id"] == year) & (df["team_id"] == equipo)]
 
-# Ordenar por fecha
+
 df_filtrado = df_filtrado.sort_values("date_game")
 
-# Acumulado de W y L
+
 df_filtrado["Wins"] = (df_filtrado["game_result"] == "W").cumsum()
 df_filtrado["Losses"] = (df_filtrado["game_result"] == "L").cumsum()
 
@@ -61,7 +61,7 @@ ax.set_xlabel("Fecha del Juego")
 ax.set_ylabel("Cantidad")
 ax.legend()
 ax.grid(True)
-fig_linea.autofmt_xdate()  # Rotar fechas
+fig_linea.autofmt_xdate()  
 
 st.pyplot(fig_linea)
 
