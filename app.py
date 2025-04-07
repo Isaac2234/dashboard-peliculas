@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-movies_data = pd.read_csv("../datasets/movies.csv")
+movies_data = pd.read_csv("datasets/movies.csv")
 
 # valores unicos para cada componente en la barra lateral
 score_rating = movies_data['score'].unique().tolist()
