@@ -2,79 +2,76 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Cargar datos
-nba_data = pd.read_csv("datasets/nba_all_elo.csv")
+# Cargar el dataset
+df = pd.read_csv("datasets/nba_all_elo.csv")
 
-# Título de la app
-st.title("🏀 Dashboard de la NBA")
+# Asegurarse de que las fechas estén en formato datetime
+df["date_game"] = pd.to_datetime(df["date_game"])
 
-# Barra lateral con selectores
-st.sidebar.header("🎯 Filtros")
+# Título
+st.title("Dashboard de Juegos NBA")
 
-# Selector de año
-years = sorted(nba_data['year_id'].unique())
-selected_year = st.sidebar.selectbox("Selecciona un año", years, index=0)
+# --- Filtros en la barra lateral ---
+with st.sidebar:
+    st.header("Filtros")
 
-# Selector de equipo
-teams = sorted(nba_data['team_id'].unique())
-selected_team = st.sidebar.selectbox("Selecciona un equipo", teams, index=0)
+    # Año
+    year = st.selectbox("Selecciona el año", sorted(df["year_id"].unique(), reverse=True))
 
-# Selector de tipo de juego
-tipo_juego = st.sidebar.radio(
-    "Selecciona tipo de juegos",
-    ("Temporada regular", "Playoffs", "Ambos"),
-    horizontal=True
-)
+    # Equipos disponibles para ese año
+    equipos_disponibles = df[df["year_id"] == year]["team_id"].unique()
+    equipo = st.selectbox("Selecciona el equipo", sorted(equipos_disponibles))
 
-# Aplicar filtros
-df_filtered = nba_data[
-    (nba_data['year_id'] == selected_year) &
-    (nba_data['team_id'] == selected_team)
-]
+    # Pills (radio horizontal) para tipo de juego
+    tipo_juego = st.pills("Tipo de juego", ["Temporada Regular", "Playoffs", "Ambos"])
 
-if tipo_juego == "Temporada regular":
-    df_filtered = df_filtered[df_filtered['is_playoffs'] == 0]
+# Filtrar base según selección
+if tipo_juego == "Temporada Regular":
+    df_filtrado = df[(df["year_id"] == year) & (df["team_id"] == equipo) & (df["is_playoffs"] == 0)]
 elif tipo_juego == "Playoffs":
-    df_filtered = df_filtered[df_filtered['is_playoffs'] == 1]
-
-# Verificamos si hay datos
-if df_filtered.empty:
-    st.warning("⚠️ No hay datos disponibles para los filtros seleccionados.")
+    df_filtrado = df[(df["year_id"] == year) & (df["team_id"] == equipo) & (df["is_playoffs"] == 1)]
 else:
-    # Ordenar por número de juego en la temporada
-    df_filtered = df_filtered.sort_values(by='seasongame')
+    df_filtrado = df[(df["year_id"] == year) & (df["team_id"] == equipo)]
 
-    # Crear columnas para acumulado
-    df_filtered['Ganados'] = (df_filtered['game_result'] == 'W').cumsum()
-    df_filtered['Perdidos'] = (df_filtered['game_result'] == 'L').cumsum()
+# Ordenar por fecha
+df_filtrado = df_filtrado.sort_values("date_game")
 
-    # Gráfica de líneas
-    st.subheader(f"📈 Juegos Ganados vs Perdidos - {selected_team} en {selected_year}")
-    fig_line, ax = plt.subplots()
-    ax.plot(df_filtered['seasongame'], df_filtered['Ganados'], label='Ganados', color='green')
-    ax.plot(df_filtered['seasongame'], df_filtered['Perdidos'], label='Perdidos', color='red')
-    ax.set_xlabel("Juego de la temporada")
-    ax.set_ylabel("Acumulado")
-    ax.set_title(f"Ganados vs Perdidos - {selected_team}")
-    ax.legend()
-    st.pyplot(fig_line)
+# Acumulado de W y L
+df_filtrado["Wins"] = (df_filtrado["game_result"] == "W").cumsum()
+df_filtrado["Losses"] = (df_filtrado["game_result"] == "L").cumsum()
 
-    # Gráfica de pastel
-    st.subheader("📊 Porcentaje de Juegos Ganados vs Perdidos")
+# --- Gráfica de líneas (por fecha) ---
+fig_linea, ax = plt.subplots()
 
-    won_games = (df_filtered['game_result'] == 'W').sum()
-    lost_games = (df_filtered['game_result'] == 'L').sum()
-    total_games = won_games + lost_games
+if tipo_juego == "Ambos":
+    reg = df_filtrado[df_filtrado["is_playoffs"] == 0]
+    po = df_filtrado[df_filtrado["is_playoffs"] == 1]
 
-    if total_games > 0:
-        fig_pie, ax_pie = plt.subplots()
-        ax_pie.pie(
-            [won_games, lost_games],
-            labels=['Ganados', 'Perdidos'],
-            autopct='%1.1f%%',
-            colors=['green', 'red']
-        )
-        ax_pie.set_title("Distribución de resultados")
-        st.pyplot(fig_pie)
-    else:
-        st.warning("No hay datos suficientes para mostrar la gráfica de pastel.")
+    ax.plot(reg["date_game"], reg["Wins"], label="Ganados (Reg)", color="green", marker="o")
+    ax.plot(reg["date_game"], reg["Losses"], label="Perdidos (Reg)", color="red", marker="o")
+
+    ax.plot(po["date_game"], po["Wins"], label="Ganados (Playoffs)", color="darkgreen", linestyle="--", marker="x")
+    ax.plot(po["date_game"], po["Losses"], label="Perdidos (Playoffs)", color="darkred", linestyle="--", marker="x")
+else:
+    ax.plot(df_filtrado["date_game"], df_filtrado["Wins"], label="Ganados", color="green", marker="o")
+    ax.plot(df_filtrado["date_game"], df_filtrado["Losses"], label="Perdidos", color="red", marker="o")
+
+ax.set_title(f"Acumulado de Juegos Ganados y Perdidos ({tipo_juego})")
+ax.set_xlabel("Fecha del Juego")
+ax.set_ylabel("Cantidad")
+ax.legend()
+ax.grid(True)
+fig_linea.autofmt_xdate()  # Rotar fechas
+
+st.pyplot(fig_linea)
+
+# --- Gráfica de pastel ---
+total_wins = (df_filtrado["game_result"] == "W").sum()
+total_losses = (df_filtrado["game_result"] == "L").sum()
+
+fig_pie, ax_pie = plt.subplots()
+ax_pie.pie([total_wins, total_losses], labels=["Ganados", "Perdidos"], autopct='%1.1f%%',
+           colors=["green", "red"], startangle=90)
+ax_pie.set_title(f"Porcentaje de Juegos Ganados y Perdidos ({tipo_juego})")
+
+st.pyplot(fig_pie)
